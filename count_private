@@ -1,0 +1,76 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <pthread.h>
+
+#define ARRAY_SIZE 1000000 // Adjust as needed
+#define NUM_THREADS 32   // Adjust as needed
+
+int array[ARRAY_SIZE];
+int threadCounts[NUM_THREADS]; // Array to hold counts for each thread
+
+void *countOnes(void *threadid)
+{
+    long tid = (long)threadid;
+    int localCount = 0;
+    int i;
+
+    int start = (tid * ARRAY_SIZE) / NUM_THREADS;
+    int end = ((tid + 1) * ARRAY_SIZE) / NUM_THREADS;
+
+    for (i = start; i < end; i++)
+    {
+        if (array[i] == 1)
+        {
+            localCount++;
+        }
+    }
+
+    threadCounts[tid] = localCount; // Update the local count to the global array
+    pthread_exit(NULL);
+}
+
+int main()
+{
+    pthread_t threads[NUM_THREADS];
+    int rc;
+    long t;
+    int globalCount = 0;
+
+    // Initialize the array with random numbers [0, 5]
+    for (int i = 0; i < ARRAY_SIZE; i++)
+    {
+        array[i] = rand() % 6;
+    }
+
+    for (t = 0; t < NUM_THREADS; t++)
+    {
+        rc = pthread_create(&threads[t], NULL, countOnes, (void *)t);
+        if (rc)
+        {
+            printf("ERROR; return code from pthread_create() is %d\n", rc);
+            exit(-1);
+        }
+    }
+
+    for (t = 0; t < NUM_THREADS; t++)
+    {
+        pthread_join(threads[t], NULL);
+        globalCount += threadCounts[t]; // Aggregate the counts from each thread
+    }
+
+    printf("Total count of 1s with private counts: %d\n", globalCount);
+
+    pthread_exit(NULL);
+}
+
+//  Each thread calculates the count of '1's within its assigned segment of the array and stores the result in a local variable (`localCount`).
+// - After a thread finishes, it writes its `localCount` to a global array `threadCounts`, which holds the counts from all threads.
+// - After all threads have completed, the main thread aggregates these counts to get the final total.
+
+// This approach eliminates the need for synchronization mechanisms like mutexes since the count variables are not shared between threads. Each thread operates independently on its own portion of data, leading to efficient parallel processing.
+
+// thread 1, array size 1000, count : 162, time : 0.389 thread 2, array size 1000, count : 162, time : 0.379 thread 4, array size 1000, count : 162, time : 0.367 thread 32, array size 1000, count : 162, time : 0.349
+
+// thread 1, array size 1000, count : 166858, time : 0.424 thread 2, array size 1000, count : 166858, time : 0.382 thread 4, array size 1000, count : 166858, time : 0.385 thread 32, array size 1000, count : 166858, time : 0.417
+
+   

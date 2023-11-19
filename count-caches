@@ -1,0 +1,79 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <pthread.h>
+
+#define ARRAY_SIZE 1000000 // Adjust as needed
+#define NUM_THREADS 32  // Adjust as needed
+#define CACHE_LINE_SIZE 64
+
+// Define a struct to avoid false sharing
+typedef struct PaddedCounter
+{
+    int count;
+    char padding[CACHE_LINE_SIZE - sizeof(int)]; // Padding to fill up the cache line
+} PaddedCounter;
+
+int array[ARRAY_SIZE];
+PaddedCounter threadCounts[NUM_THREADS]; // Array of padded counters
+
+void *countOnes(void *threadid)
+{
+    long tid = (long)threadid;
+    int i;
+
+    int start = (tid * ARRAY_SIZE) / NUM_THREADS;
+    int end = ((tid + 1) * ARRAY_SIZE) / NUM_THREADS;
+
+    threadCounts[tid].count = 0; // Initialize the local count
+
+    for (i = start; i < end; i++)
+    {
+        if (array[i] == 1)
+        {
+            threadCounts[tid].count++;
+        }
+    }
+
+    pthread_exit(NULL);
+}
+
+int main()
+{
+    pthread_t threads[NUM_THREADS];
+    int rc;
+    long t;
+    int globalCount = 0;
+
+    // Initialize the array with random numbers [0, 5]
+    for (int i = 0; i < ARRAY_SIZE; i++)
+    {
+        array[i] = rand() % 6;
+    }
+
+    for (t = 0; t < NUM_THREADS; t++)
+    {
+        rc = pthread_create(&threads[t], NULL, countOnes, (void *)t);
+        if (rc)
+        {
+            printf("ERROR; return code from pthread_create() is %d\n", rc);
+            exit(-1);
+        }
+    }
+
+    for (t = 0; t < NUM_THREADS; t++)
+    {
+        pthread_join(threads[t], NULL);
+        globalCount += threadCounts[t].count; // Aggregate the padded counts
+    }
+
+    printf("Total count of 1s with cache padding: %d\n", globalCount);
+
+    pthread_exit(NULL);
+}
+
+// array size: 1000, count: 162 
+// 1 - 0.445 
+// 2 - 0.413 
+// 4 - 0.408 
+// 5 - 0.384 
+// better performance

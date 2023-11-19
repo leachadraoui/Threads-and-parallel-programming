@@ -1,0 +1,87 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <pthread.h>
+
+#define ARRAY_SIZE 1000000 // Adjust as needed
+#define NUM_THREADS 2    // Adjust as needed
+
+int array[ARRAY_SIZE];
+int globalCount = 0;
+
+void *countOnes(void *threadid)
+{
+    long tid = (long)threadid;
+    int i;
+
+    int start = (tid * ARRAY_SIZE) / NUM_THREADS;
+    int end = ((tid + 1) * ARRAY_SIZE) / NUM_THREADS;
+
+    for (i = start; i < end; i++)
+    {
+        if (array[i] == 1)
+        {
+            globalCount++; // No synchronization, leads to race condition
+        }
+    }
+
+    pthread_exit(NULL);
+}
+
+int main()
+{
+    pthread_t threads[NUM_THREADS];
+    int rc;
+    long t;
+
+    // Initialize the array with random numbers [0, 5]
+    for (int i = 0; i < ARRAY_SIZE; i++)
+    {
+        array[i] = rand() % 6;
+    }
+    
+
+    for (t = 0; t < NUM_THREADS; t++)
+    {
+        rc = pthread_create(&threads[t], NULL, countOnes, (void *)t);
+        if (rc)
+        {
+            printf("ERROR; return code from pthread_create() is %d\n", rc);
+            exit(-1);
+        }
+    }
+
+    for (t = 0; t < NUM_THREADS; t++)
+    {
+        pthread_join(threads[t], NULL);
+    }
+
+    
+    printf("Total count of 1s (race condition): %d\n", globalCount);
+
+    pthread_exit(NULL);
+}
+
+// - The global variable `globalCount` is updated by each thread without any mutex or synchronization.
+// - This results in a race condition because multiple threads might read and write to `globalCount` simultaneously, leading to incorrect updates.
+// - Running this program multiple times lead to different results for `globalCount` due to the race condition.
+// - The count might be less than the actual number of 1s in the array, demonstrating the issue with concurrent updates without synchronization.
+
+
+    // array size 1000 threads 1 count 162 time 0.396
+
+    // array size 1000 threads 2 count 155 time 0.387
+
+    // array size 1000 threads 4 count 162 time 0.35
+
+    // array size 1000 threads 32 count 162 time 0.393
+
+    // array size 1000000 threads 1 count 166858 time 0.408
+
+    // array size 1000000 threads 2 count 149712 time 0.457
+
+    // array size 1000000 threads 4 count 78953 time 0.415
+
+    // array size 1000000 threads 32 count 67633 time 0.389
+
+    // race condintion on array size 1000000 number of thread = 2 
+    // 113199. 120455, 99689, 105536, 130507, 143260, 105022, 106685, 101101, 143064, 103554, 104544, 111031, 99908, 109358,

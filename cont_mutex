@@ -1,0 +1,86 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <pthread.h>
+
+#define ARRAY_SIZE 1000000 // Adjust as needed
+#define NUM_THREADS 32   // Adjust as needed
+
+int array[ARRAY_SIZE];
+int globalCount = 0;
+pthread_mutex_t countMutex;
+
+void *countOnes(void *threadid)
+{
+    long tid = (long)threadid;
+    int i;
+
+    int start = (tid * ARRAY_SIZE) / NUM_THREADS;
+    int end = ((tid + 1) * ARRAY_SIZE) / NUM_THREADS;
+
+    for (i = start; i < end; i++)
+    {
+        if (array[i] == 1)
+        {
+            pthread_mutex_lock(&countMutex); // Lock the mutex
+            globalCount++;
+            pthread_mutex_unlock(&countMutex); // Unlock the mutex
+        }
+    }
+
+    pthread_exit(NULL);
+}
+
+int main()
+{
+    pthread_t threads[NUM_THREADS];
+    int rc;
+    long t;
+
+    // Initialize the array with random numbers [0, 5]
+    for (int i = 0; i < ARRAY_SIZE; i++)
+    {
+        array[i] = rand() % 6;
+    }
+
+    pthread_mutex_init(&countMutex, NULL); // Initialize the mutex
+
+    for (t = 0; t < NUM_THREADS; t++)
+    {
+        rc = pthread_create(&threads[t], NULL, countOnes, (void *)t);
+        if (rc)
+        {
+            printf("ERROR; return code from pthread_create() is %d\n", rc);
+            exit(-1);
+        }
+    }
+
+    for (t = 0; t < NUM_THREADS; t++)
+    {
+        pthread_join(threads[t], NULL);
+    }
+
+    printf("Total count of 1s with mutex: %d\n", globalCount);
+
+    pthread_mutex_destroy(&countMutex); // Destroy the mutex
+    pthread_exit(NULL);
+}
+
+// Each thread locks the mutex before updating `globalCount` and unlocks it afterward.This ensures that only one thread at a time can modify `globalCount`.- The mutex is initialized before creating threads and destroyed after they have all completed.
+                                                          //This version consistently gives the correct count of 1s in the array,
+//     regardless of how many times its run, it demonstrates the effectiveness of mutexes in resolving race conditions.
+
+    // array size 1000 thread 1 count 162 time 0.386
+
+    // array size 1000 thread 2 count 162 time 0.403
+
+    // array size 1000 thread 4 count 162 time  0.387
+
+    // array size 1000 thread 32 count 162 time 0.419
+
+    // array size 1000000 thread 1 count 166858 time 0.448
+
+    // array size 1000000 thread 2 count 166858 time 0.412
+
+    // array size 1000000 thread 4 count 166858 time 0.398
+
+    // array size 1000000 thread 32 count 166858 time 0.319

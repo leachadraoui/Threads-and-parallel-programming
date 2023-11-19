@@ -1,0 +1,92 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <pthread.h>
+
+#define ARRAY_SIZE 1000 // Adjust as needed
+#define NUM_THREADS 4   // Adjust as needed
+
+int array[ARRAY_SIZE];
+int globalCount = 0;
+pthread_mutex_t mutexCount;
+
+void *countOnes(void *threadid)
+{
+    long tid = (long)threadid;
+    int localCount = 0;
+    int i;
+
+    int start = (tid * ARRAY_SIZE) / NUM_THREADS;
+    int end = ((tid + 1) * ARRAY_SIZE) / NUM_THREADS;
+
+    for (i = start; i < end; i++)
+    {
+        if (array[i] == 1)
+        {
+            localCount++;
+        }
+    }
+
+    pthread_mutex_lock(&mutexCount);
+    globalCount += localCount;
+    pthread_mutex_unlock(&mutexCount);
+
+    pthread_exit(NULL);
+}
+
+int main()
+{
+    pthread_t threads[NUM_THREADS];
+    int rc;
+    long t;
+
+    // Initialize the array with random numbers [0, 5]
+    for (int i = 0; i < ARRAY_SIZE; i++)
+    {
+        array[i] = rand() % 6;
+    }
+
+    pthread_mutex_init(&mutexCount, NULL);
+
+    for (t = 0; t < NUM_THREADS; t++)
+    {
+        rc = pthread_create(&threads[t], NULL, countOnes, (void *)t);
+        if (rc)
+        {
+            printf("ERROR; return code from pthread_create() is %d\n", rc);
+            exit(-1);
+        }
+    }
+
+    for (t = 0; t < NUM_THREADS; t++)
+    {
+        pthread_join(threads[t], NULL);
+    }
+
+    printf("Total count of 1s: %d\n", globalCount);
+
+    pthread_mutex_destroy(&mutexCount);
+    pthread_exit(NULL);
+}
+
+//array size 1000 
+// num threads 1 
+// count 162 
+// time 0.409
+
+//array size 1000 
+// threads 2 
+// count 162 
+// time 0.402
+
+//array size 1000 
+// num of threads 4 
+// total count of 1s : 162 
+// time taken : 0.452
+
+// array size 1000 
+// num of threads 32 
+// total count 162 
+// time taken : 0.384
+
+
+
